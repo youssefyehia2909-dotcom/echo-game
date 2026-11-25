@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="صدى">
+<meta name="description" content="صدى: لعبة ألغاز، كل جولة تسجّلها تصير صدى يعيد خطواتك.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:#0b1417}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>صدى</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@500;700&family=Tajawal:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column. Menu = title, lore, chapter grids. Play = HUD, canvas board, thumb controls. */
+:root {
+  --bg: #0b1417;
+  --panel: #121f24;
+  --floor: #1b2f36;
+  --floor2: #172a31;
+  --wall: #060c0e;
+  --line: #243a42;
+  --fg: #e8f1ee;
+  --muted: #8ba4a7;
+  --me: #ffe3a3;
+  --echo: #8fdcf2;
+  --exit: #b68cff;
+  --c0: #ff7a5c;
+  --c1: #4da3ff;
+  --c2: #8bdc6a;
+  --accent: #f2c86b;
+  --accent-ink: #2b1d00;
+  --warn: #ff9d8a;
+  --font-display: "Reem Kufi", "Segoe UI", Tahoma, sans-serif;
+  --font-body: "Tajawal", "Segoe UI", Tahoma, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  padding-block: 16px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+#app { max-width: 480px; margin-inline: auto; }
+button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; margin: 0; text-wrap: balance; }
+
+/* ---------- menu ---------- */
+.hero { display: flex; align-items: center; gap: 16px; padding-block: 8px 4px; }
+.mark { flex: none; width: 84px; height: 84px; }
+.hero h1 { font-size: 3.2rem; line-height: 1; letter-spacing: 0.02em; }
+.hero p { margin: 6px 0 0; color: var(--muted); font-size: 0.98rem; }
+.lore { color: var(--muted); margin: 14px 0 18px; max-width: 46ch; }
+.lore b { color: var(--fg); font-weight: 500; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 10px 18px; min-height: 44px; font-weight: 500;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+.btn:disabled { opacity: 0.4; cursor: default; }
+.chapter { margin-top: 26px; }
+.chapter-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.chapter-head h3 { font-size: 1.25rem; }
+.chapter-head span { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.lv {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 10px 4px 8px; min-height: 64px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel);
+}
+.lv b { font-family: var(--font-display); font-size: 1.35rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.lv .st { font-size: 0.72rem; letter-spacing: 0.08em; color: var(--line); height: 1em; }
+.lv .st i { font-style: normal; color: var(--accent); }
+.lv[aria-disabled="true"] { opacity: 0.38; cursor: default; }
+.lv.next { border-color: var(--accent); }
+.foot { margin-top: 28px; color: var(--muted); font-size: 0.85rem; }
+.linkbtn { background: none; border: 0; padding: 8px 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- play ---------- */
+.top { display: flex; align-items: center; gap: 12px; }
+.top .btn { padding: 6px 14px; min-height: 40px; }
+.top h2 { font-size: 1.25rem; flex: 1; min-width: 0; }
+.top h2 small { color: var(--muted); font-family: var(--font-body); font-weight: 400; font-size: 0.85rem; margin-inline-start: 8px; }
+.hud { margin-top: 12px; display: grid; gap: 8px; }
+.hud-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 0.88rem; color: var(--muted); }
+.slots { display: flex; gap: 6px; align-items: center; }
+.slot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--echo); opacity: 0.55; }
+.slot.used { background: var(--echo); opacity: 1; }
+.ticks { display: flex; gap: 2px; height: 8px; }
+.ticks i { flex: 1; min-width: 0; background: var(--line); border-radius: 2px; }
+.ticks i.on { background: var(--me); }
+.ticks i.hot { background: var(--warn); }
+#stage { margin-top: 12px; display: flex; justify-content: center; }
+#board { display: block; border-radius: 14px; box-shadow: 0 0 0 1px var(--line); touch-action: none; background: var(--wall); }
+#board.shake { animation: shake 0.22s linear; }
+@keyframes shake { 20% { transform: translateX(-4px); } 60% { transform: translateX(4px); } }
+#msg { min-height: 1.6em; margin: 10px 0 2px; text-align: center; color: var(--muted); font-size: 0.95rem; }
+#msg.warn { color: var(--warn); }
+.hintbox { color: var(--muted); font-size: 0.9rem; text-align: center; margin: 0 0 12px; text-wrap: balance; }
+.controls { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.dpad { direction: ltr; display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 56px); gap: 8px; }
+.dpad button { border-radius: 14px; border: 1px solid var(--line); background: var(--panel); font-size: 1.25rem; }
+.dpad button:active { background: var(--floor); }
+.dpad .up { grid-column: 2; grid-row: 1; }
+.dpad .lf { grid-column: 1; grid-row: 2; }
+.dpad .dn { grid-column: 2; grid-row: 2; }
+.dpad .rt { grid-column: 3; grid-row: 2; }
+.dpad .wt { grid-column: 3; grid-row: 1; font-size: 0.85rem; font-family: var(--font-body); }
+.actions { display: flex; gap: 10px; width: 100%; }
+.actions .btn { flex: 1; padding-inline: 8px; }
+.actions .btn.primary { flex: 1.4; }
+.modal {
+  position: fixed; inset: 0; display: grid; place-items: center; background: rgba(5, 10, 12, 0.82); z-index: 20;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.modal[hidden] { display: none !important; }
+.sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px 20px; width: min(100%, 360px); text-align: center; display: grid; gap: 12px; }
+.sheet h2 { font-size: 1.7rem; }
+.sheet p { margin: 0; color: var(--muted); }
+.stars { font-size: 2.2rem; letter-spacing: 0.15em; color: var(--line); line-height: 1.1; }
+.stars i { font-style: normal; color: var(--accent); }
+.sheet .row { justify-content: center; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { #board.shake { animation: none; } }
+</style>
+
+</head>
+<body>
+<div id="app" dir="rtl" lang="ar">
+
+  <section id="menu">
+    <div class="hero">
+      <svg class="mark" viewBox="0 0 84 84" aria-hidden="true">
+        <circle cx="42" cy="42" r="38" fill="none" stroke="#8fdcf2" stroke-opacity="0.18" stroke-width="2"/>
+        <circle cx="42" cy="42" r="28" fill="none" stroke="#8fdcf2" stroke-opacity="0.38" stroke-width="2"/>
+        <circle cx="42" cy="42" r="18" fill="none" stroke="#8fdcf2" stroke-opacity="0.6" stroke-width="2"/>
+        <circle cx="42" cy="42" r="8" fill="#ffe3a3"/>
+      </svg>
+      <div>
+        <h1>صدى</h1>
+        <p>كل محاولة تترك وراءها نسخة منك.</p>
+      </div>
+    </div>
+    <p class="lore">أنت حارس برج قديم أبوابه لا تفتح إلا بالوزن. <b>كل جولة تسجّلها تصير صدى</b> يعيد خطواتك بالحرف ثم يقف حيث انتهى. اجعل أصداءك تضغط الحلقات، ثم اعبر أنت إلى البوابة البنفسجية.</p>
+    <div class="row">
+      <button class="btn primary" id="continue">ابدأ</button>
+    </div>
+    <div id="chapters"></div>
+    <div class="foot">
+      <p>الحلقة تفتح الباب الذي بلونها ما دام أحد واقفًا عليها. الباب ذو الحلقات المتعددة يحتاج كلها معًا.</p>
+      <button class="linkbtn" id="wipe">مسح التقدّم</button>
+    </div>
+  </section>
+
+  <section id="play" hidden>
+    <div class="top">
+      <button class="btn" id="back">القائمة</button>
+      <h2 id="title"></h2>
+    </div>
+    <div class="hud">
+      <div class="hud-row"><span>الأصداء</span><span class="slots" id="slots"></span><span id="goal"></span></div>
+      <div class="ticks" id="ticks" aria-hidden="true"></div>
+      <div class="hud-row"><span id="steptxt"></span><span></span></div>
+    </div>
+    <div id="stage"><canvas id="board" role="img" aria-label="لوحة اللعب"></canvas></div>
+    <div id="msg" role="status" aria-live="polite"></div>
+    <p class="hintbox" id="hint"></p>
+    <div class="controls">
+      <div class="dpad" id="dpad">
+        <button class="up" data-d="U" aria-label="فوق">▲</button>
+        <button class="lf" data-d="L" aria-label="يسار">◀</button>
+        <button class="dn" data-d="D" aria-label="تحت">▼</button>
+        <button class="rt" data-d="R" aria-label="يمين">▶</button>
+        <button class="wt" data-d="S" aria-label="انتظر خطوة">انتظر</button>
+      </div>
+      <div class="actions">
+        <button class="btn" id="undo">تراجع</button>
+        <button class="btn primary" id="echo">سجّل صدى</button>
+        <button class="btn" id="reset">إعادة</button>
+      </div>
+      <button class="linkbtn" id="solve">اعرض الحل</button>
+    </div>
+  </section>
+
+  <div class="modal" id="win" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="win-title">
+      <h2 id="win-title">عبرت</h2>
+      <div class="stars" id="win-stars" aria-hidden="true"></div>
+      <p id="win-text"></p>
+      <div class="row">
+        <button class="btn primary" id="win-next">المرحلة التالية</button>
+        <button class="btn" id="win-again">من جديد</button>
+        <button class="btn" id="win-menu">القائمة</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Echo engine: pure, deterministic simulation. Shared by the game and the tests. */
+(function (root) {
+  "use strict";
+
+  var DIRS = { U: [0, -1], D: [0, 1], L: [-1, 0], R: [1, 0], S: [0, 0] };
+
+  /* Level legend: # wall, . floor, S start, E exit,
+     a b c = pressure plates, A B C = doors of the matching colour.
+     A door is open only while EVERY plate of its colour is occupied. */
+  function parse(def) {
+    var rows = def.rows, h = rows.length, w = rows[0].length;
+    var L = {
+      name: def.name, hint: def.hint, T: def.T, maxEchoes: def.maxEchoes,
+      w: w, h: h, wall: new Array(w * h), plateAt: new Array(w * h),
+      doorAt: new Array(w * h), start: -1, exit: -1,
+      plates: [], colorMask: [0, 0, 0], doorCount: [0, 0, 0]
+    };
+    for (var y = 0; y < h; y++) {
+      if (rows[y].length !== w) throw new Error("row width mismatch in " + def.name);
+      for (var x = 0; x < w; x++) {
+        var i = y * w + x, ch = rows[y][x];
+        L.wall[i] = ch === "#"; L.plateAt[i] = -1; L.doorAt[i] = -1;
+        if (ch === "S") L.start = i;
+        else if (ch === "E") L.exit = i;
+        else if (ch >= "a" && ch <= "c") {
+          var color = ch.charCodeAt(0) - 97, id = L.plates.length;
+          L.plates.push({ x: x, y: y, i: i, color: color });
+          L.plateAt[i] = id; L.colorMask[color] |= 1 << id;
+        } else if (ch >= "A" && ch <= "C") {
+          var dc = ch.charCodeAt(0) - 65;
+          L.doorAt[i] = dc; L.doorCount[dc]++;
+        } else if (ch !== "#" && ch !== ".") throw new Error("bad tile " + ch);
+      }
+    }
+    if (L.start < 0 || L.exit < 0) throw new Error("level needs S and E: " + def.name);
+    for (var c = 0; c < 3; c++) {
+      if (L.doorCount[c] && !L.colorMask[c]) throw new Error("door without plate in " + def.name);
+    }
+    return L;
+  }
+
+  function bit(L, i) { var p = L.plateAt[i]; return p >= 0 ? (1 << p) : 0; }
+  function doorOpen(L, mask, c) { var m = L.colorMask[c]; return m !== 0 && (mask & m) === m; }
+
+  /* One step from cell i in direction d, given the occupied-plates mask at that moment.
+     Returns the new cell, or -1 when the move is not allowed. */
+  function step(L, mask, i, d) {
+    var v = DIRS[d]; if (!v) return -1;
+    if (d === "S") return i;
+    var x = i % L.w + v[0], y = Math.floor(i / L.w) + v[1];
+    if (x < 0 || y < 0 || x >= L.w || y >= L.h) return -1;
+    var j = y * L.w + x;
+    if (L.wall[j]) return -1;
+    var dc = L.doorAt[j];
+    if (dc >= 0 && !doorOpen(L, mask, dc)) return -1;
+    return j;
+  }
+
+  /* Positions of one recorded echo over time 0..T. Its legality only depends on
+     earlier echoes (sched) and on itself, so later echoes can never block it.
+     After its moves end it parks on its final tile. */
+  function trace(L, moves, sched) {
+    var T = L.T, pos = new Array(T + 1), masks = new Array(T + 1), cur = L.start;
+    for (var t = 0; t <= T; t++) {
+      pos[t] = cur; masks[t] = bit(L, cur);
+      if (t < T && t < moves.length) {
+        var n = step(L, (sched[t] | masks[t]), cur, moves[t]);
+        if (n >= 0) cur = n;
+      }
+    }
+    return { pos: pos, masks: masks };
+  }
+
+  function emptySched(L) { var s = new Array(L.T + 1); for (var t = 0; t <= L.T; t++) s[t] = 0; return s; }
+
+  /* Full world for the current round. ghosts: array of move arrays (or strings). */
+  function world(L, ghosts, myMoves) {
+    var sched = emptySched(L), ghostPos = [], k, t;
+    for (k = 0; k < ghosts.length; k++) {
+      var tr = trace(L, ghosts[k], sched);
+      for (t = 0; t <= L.T; t++) sched[t] |= tr.masks[t];
+      ghostPos.push(tr.pos);
+    }
+    var me = [L.start], cur = L.start, solvedAt = -1, bad = -1;
+    for (t = 0; t < myMoves.length && t < L.T; t++) {
+      var n = step(L, sched[t] | bit(L, cur), cur, myMoves[t]);
+      if (n < 0) { bad = t; break; }
+      cur = n; me.push(cur);
+      if (cur === L.exit) { solvedAt = t + 1; break; }
+    }
+    return { sched: sched, ghostPos: ghostPos, me: me, solvedAt: solvedAt, bad: bad, t: me.length - 1 };
+  }
+
+  /* Mask of occupied plates at time t, including the player's own position. */
+  function maskAt(L, w, t) { return w.sched[t] | bit(L, w.me[Math.min(t, w.me.length - 1)]); }
+
+  /* Can the player make move d now? Returns {ok, why}. */
+  function tryMove(L, ghosts, myMoves, d) {
+    if (myMoves.length >= L.T) return { ok: false, why: "time" };
+    var w = world(L, ghosts, myMoves);
+    if (w.solvedAt >= 0 || w.bad >= 0) return { ok: false, why: "done" };
+    var t = w.t, cur = w.me[t];
+    if (d === "S") return { ok: true };
+    var n = step(L, w.sched[t] | bit(L, cur), cur, d);
+    if (n >= 0) return { ok: true };
+    var v = DIRS[d], x = cur % L.w + v[0], y = Math.floor(cur / L.w) + v[1];
+    if (x < 0 || y < 0 || x >= L.w || y >= L.h || L.wall[y * L.w + x]) return { ok: false, why: "wall" };
+    return { ok: false, why: "door" };
+  }
+
+  root.Echo = { DIRS: DIRS, parse: parse, bit: bit, doorOpen: doorOpen, step: step,
+    trace: trace, world: world, maskAt: maskAt, tryMove: tryMove, emptySched: emptySched };
+  if (typeof module !== "undefined" && module.exports) module.exports = root.Echo;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+(function () {
+  "use strict";
+  var LEVELS = [{"name":"الخطوة الأولى","hint":"تحرّك بالأسهم أو بالسحب على اللوحة، ووصّل إلى البوابة البنفسجية.","T":8,"maxEchoes":1,"rows":["#######","#S...E#","#######"],"par":0,"solution":["RRRR"]},{"name":"الصدى الأول","hint":"الباب لا يفتح إلا والحلقة مضغوطة. اترك صدى يقف عليها بدلًا منك.","T":12,"maxEchoes":2,"rows":["#########","#a#######","#.#######","#S..A..E#"],"par":1,"solution":["UU","RRRRRR"]},{"name":"توأمان","hint":"الباب يطلب حلقتين مضغوطتين معًا. كل صدى يحرس حلقة.","T":12,"maxEchoes":3,"rows":["#########","#a#a#####","#.#.#####","#S..A..E#"],"par":2,"solution":["UU","RRUU","UDRRRRRR"]},{"name":"السلسلة","hint":"الحلقة الثانية خلف الباب الأول. افتح الطريق لصدى، ثم لنفسك.","T":14,"maxEchoes":3,"rows":["##########","#a########","#.########","#S..A.B.E#","#####b####","##########"],"par":2,"solution":["UU","RRRRD","RRRRSRRR"]},{"name":"الرواق","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":13,"maxEchoes":3,"rows":["#########","#E..#...#","###.#a###","#..A#.#.#","#.###.#.#","#..S....#","#########"],"par":1,"solution":["RRUUU","LLUURRUULL"]},{"name":"الفناء","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":13,"maxEchoes":3,"rows":["###########","#a..#S....#","#.###.#.#.#","#.....#.#.#","#.#####.#.#","#.#E...A#.#","###########"],"par":1,"solution":["DDLLLLUU","DURRDDDSDLLLL"]},{"name":"السرداب","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":15,"maxEchoes":3,"rows":["###########","#....S....#","#.#######.#","#.....#...#","#.###.#A###","#a..#.#..E#","###########"],"par":1,"solution":["LLLLDDDD","RRRRDDLLDDRR"]},{"name":"المنارة","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":15,"maxEchoes":3,"rows":["###########","#.A......S#","#.###.###.#","#..E#a#...#","#.###.#.###","#.#...#...#","###########"],"par":1,"solution":["LLLLDD","LLLLLLLLDDRR"]},{"name":"الجسر","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":17,"maxEchoes":3,"rows":["###########","#........A#","#####.###.#","#S....#.#.#","#.#####.#.#","#......a#E#","###########"],"par":1,"solution":["DDRRRRRR","RRRRUURRRRDDDD"]},{"name":"الشرفة","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":20,"maxEchoes":3,"rows":["#########","#......a#","#.#A#####","#.#.....#","#.#####.#","#S....#E#","#########"],"par":1,"solution":["UUUURRRRRR","UUUUDUDURRDDRRRRDD"]},{"name":"القبو","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":19,"maxEchoes":3,"rows":["###########","#.#.......#","#.#.#.###a#","#.A.#..S#.#","#.#####.#.#","#....E#.#.#","###########"],"par":1,"solution":["LLUURRRRD","LLUULLDDSLLDDRRRR"]},{"name":"الدهليز","hint":"باب واحد وحلقة واحدة. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":19,"maxEchoes":3,"rows":["###########","#......a..#","#####.###.#","#E..#...#.#","###.###.###","#.#...#S..#","#.###A###.#","#.........#","###########"],"par":1,"solution":["UULLUURR","RRDDLLLLUULLUULL"]},{"name":"الميزان","hint":"باب واحد وحلقتان. صدى واحد يكفي إذا وضعته في المكان الصحيح. ابحث عن حلقة تقع قبل الباب مباشرة.","T":15,"maxEchoes":3,"rows":["#########","#a...S..#","###.###.#","#...#...#","#.#####.#","#aA..E#.#","#########"],"par":1,"solution":["LLLL","LLDDLLDDRRRR"]},{"name":"الخزنة","hint":"باب واحد وحلقتان. صدى واحد يكفي إذا وضعته في المكان الصحيح. ابحث عن حلقة تقع قبل الباب مباشرة.","T":19,"maxEchoes":3,"rows":["#########","#....S..#","#######.#","#a......#","#.#####.#","#.#..E#.#","#.#A###.#","#.#a....#","#########"],"par":1,"solution":["RRDDLLLLLL","RRDDDDDDLLLLUURR"]},{"name":"المرصد","hint":"بابان وحلقتان. صدى واحد يكفي إذا وضعته في المكان الصحيح.","T":15,"maxEchoes":3,"rows":["#########","#S#...B.#","#.#.###.#","#..A#.#E#","#.###b###","#a......#","#########"],"par":1,"solution":["DDDDRRRRU","DDRSRUURRRRDD"]},{"name":"الساعة","hint":"بابان وحلقتان. صدى واحد يكفي إذا وضعته في المكان الصحيح. ابحث عن حلقة تقع قبل الباب مباشرة.","T":20,"maxEchoes":3,"rows":["###########","#S..A.....#","#.#####.#.#","#...#E#b#.#","###.#.#B#.#","#a..#...#.#","###########"],"par":1,"solution":["DDRRDDLL","DUDUDURRRRRRDDDDLLUU"]},{"name":"النفق","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":13,"maxEchoes":4,"rows":["#########","#E#a#...#","#.#.###.#","#.#.a...#","#A#####.#","#......S#","#########"],"par":2,"solution":["UULLL","UULLLLUU","UDLLLLLLUUUU"]},{"name":"القاعة","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":13,"maxEchoes":4,"rows":["#########","#E#S..#.#","#.#.#.#.#","#.#.#.aa#","#.#.#####","#.A.....#","#########"],"par":2,"solution":["RRDDR","RRDDRR","DUDDDDLLUUUU"]},{"name":"الحديقة","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":15,"maxEchoes":4,"rows":["#########","#.#...A.#","#.#.###.#","#.#.#.#E#","#.#.#a###","#.#.#...#","#.#.#.#a#","#..S..#.#","#########"],"par":2,"solution":["RRUUU","RRUURRD","UUUUUURRRRDD"]},{"name":"المخزن","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":15,"maxEchoes":4,"rows":["#########","#..a..#.#","#.###.#.#","#S#.a...#","#.#.#####","#.#.#..E#","#.###.###","#...A...#","#########"],"par":2,"solution":["UURR","UURRRRDDL","UDDDDDRRSRRUURR"]},{"name":"الدرج","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":15,"maxEchoes":4,"rows":["#########","#.a...a.#","#######.#","#....S..#","#.#######","#..A...E#","#########"],"par":2,"solution":["RRUUL","RRUULLLLL","LLLLDUDDRRRRRR"]},{"name":"الورشة","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":15,"maxEchoes":4,"rows":["###########","#E#..S....#","#.#.###.#.#","#.#.#a#a#.#","#.#.#.#.#.#","#A....#.#.#","###########"],"par":2,"solution":["RRDD","LLDDDDRRUU","LLDUDDDDLSLUUUU"]},{"name":"المكتبة","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":15,"maxEchoes":4,"rows":["#########","#...#E..#","#.#.###.#","#a#S#A..#","#.#.#.###","#.#....a#","#########"],"par":2,"solution":["UULLDD","DDRRRR","DDRRUSURRUULL"]},{"name":"المعمل","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":17,"maxEchoes":4,"rows":["#########","#..a#..S#","#.#.#.#.#","#.#...#.#","#######.#","#.A.....#","#.#####.#","#..E#a..#","#########"],"par":2,"solution":["DDDDDDLL","LLDDLLUU","DDDDLLLLLLDDRR"]},{"name":"البئر","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":17,"maxEchoes":4,"rows":["#########","#E#S....#","#.###.#.#","#.#...#.#","#.#.###a#","#..A#a..#","#########"],"par":2,"solution":["RRRRDDD","RRRRDDDDLL","RLRRDDLLDSDLLUUUU"]},{"name":"الكهف","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":19,"maxEchoes":4,"rows":["###########","#.....A..E#","#.#########","#...#.....#","#.#.#####a#","#.#..S#...#","#.###.#.###","#a..#.....#","###########"],"par":2,"solution":["DDRRUURRU","LLUULLDDDD","LLUULLUURRRRRRRR"]},{"name":"الصدفة","hint":"باب واحد وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":19,"maxEchoes":4,"rows":["###########","#.........#","#.#####.#.#","#a#....S#.#","#.#.#####.#","#.#.#E..#.#","#.#.###.#.#","#.#..a#.A.#","###########"],"par":2,"solution":["UULLLLLLDD","LLLLDDDDRR","UURRDDDDDDLLUULL"]},{"name":"الشلال","hint":"باب واحد و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":13,"maxEchoes":4,"rows":["#########","#.a.#.#E#","#.###.#.#","#.#.a.#.#","#.#.###.#","#S...aA.#","#########"],"par":2,"solution":["UUUUR","RRUUR","RRRRSRRUUUU"]},{"name":"الواحة","hint":"باب واحد و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":13,"maxEchoes":4,"rows":["#########","#.#.#..E#","#a#.#.###","#.#.#.Aa#","#.#.###.#","#..a.S..#","#########"],"par":2,"solution":["LL","LLLLUUU","LRRRUUSLLUURR"]},{"name":"الغابة","hint":"باب واحد و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":13,"maxEchoes":4,"rows":["#########","#E#..a.a#","#.#####.#","#.#..S..#","#.#.###.#","#Aa.#...#","#########"],"par":2,"solution":["RRUU","RRUULL","LLDDLSLUUUU"]},{"name":"البحيرة","hint":"باب واحد و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":15,"maxEchoes":4,"rows":["###########","#.........#","#######.#.#","#E...Aa.#S#","#########.#","#.aa......#","###########"],"par":2,"solution":["DDLLLLLL","DDLLLLLLL","UUDULLDDLLLLLL"]},{"name":"الجزيرة","hint":"باب واحد و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":15,"maxEchoes":4,"rows":["#########","#.....#E#","#.###.#.#","#S#...#.#","#.#####.#","#.....aA#","#.#######","#a...a..#","#########"],"par":2,"solution":["DDDD","DDDDRRRR","DDRRRRRSRUUUU"]},{"name":"الرصيف","hint":"باب واحد و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":17,"maxEchoes":4,"rows":["###########","#.Aa#..a..#","#.#.#a#####","#E#.#.....#","###.#####.#","#........S#","###########"],"par":2,"solution":["UULLLLU","UULLLLUURR","LLLLLLUUUULLDD"]},{"name":"القلعة","hint":"باب واحد و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":17,"maxEchoes":4,"rows":["###########","#a.......S#","#########.#","#.Aa......#","#.#######.#","#..E#a....#","###########"],"par":2,"solution":["DDDDLLLL","LLLLLLLL","DDLLLLLLLLDDRR"]},{"name":"البرج","hint":"بابان وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":15,"maxEchoes":4,"rows":["#########","#......a#","#.#######","#S....b.#","#.#####.#","#.#E..#.#","#.###B###","#..A....#","#########"],"par":2,"solution":["RRRRR","UURRRRRR","UDDDDDRSRRRUULL"]},{"name":"السور","hint":"بابان وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":18,"maxEchoes":4,"rows":["#########","#S..#.b.#","#.#.###.#","#.#..A..#","#.#####B#","#...#E..#","#.#.###.#","#a#...#.#","#########"],"par":2,"solution":["DDDDDD","RRDDRSRRRUUL","DUDURRDDRRRRDDLL"]},{"name":"الخندق","hint":"بابان وحلقتان. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":17,"maxEchoes":4,"rows":["###########","#.#a....A.#","#.#.#.###.#","#...#..S#.#","#######.#B#","#...b.#.#.#","#.###.#.#.#","#.#.....#E#","###########"],"par":2,"solution":["LLUULL","DDDDLLUUL","LLUURRRRDDDDDD"]},{"name":"الممر","hint":"بابان و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":13,"maxEchoes":4,"rows":["#########","#S...Ab.#","#.###.###","#.#.#.B.#","#a#b###.#","#.....#E#","#########"],"par":2,"solution":["DDDDRRU","RRRRR","RRRRDDSRRDD"]},{"name":"الحجرة","hint":"بابان و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":13,"maxEchoes":4,"rows":["#########","#...Aa.S#","###.###.#","#.B.#...#","#.###b###","#E#....b#","#########"],"par":2,"solution":["DDLLD","DDLLDDRR","DULLLLDDLLDD"]},{"name":"المصعد","hint":"بابان و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":13,"maxEchoes":4,"rows":["#########","#E#..b..#","#.#.###.#","#.#.#a#.#","#.###.#.#","#Bb.A..S#","#########"],"par":2,"solution":["LLUU","UUUULL","UDLLLLLLUUUU"]},{"name":"العلية","hint":"بابان و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":15,"maxEchoes":4,"rows":["#########","#.a...#E#","###.#.#.#","#..a#S#.#","#.###.#B#","#.#.#.#.#","#b#.#.#.#","#.#...A.#","#########"],"par":2,"solution":["UULLL","UULLDDLLDDD","UDDDDDRRUUSUUUU"]},{"name":"الإسطبل","hint":"بابان و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":17,"maxEchoes":4,"rows":["#########","#.....a.#","#.#.###.#","#S#..A#b#","#####.#.#","#E..B.#b#","#########"],"par":2,"solution":["UURRRRRRDD","UURRRRRRDDDD","UURRDDRRDDUDLLLL"]},{"name":"المطحنة","hint":"بابان و٣ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا.","T":17,"maxEchoes":4,"rows":["###########","#.#S....#E#","#.#.###.#.#","#b#...#a#.#","#.###.###B#","#...a.A...#","###########"],"par":2,"solution":["RRRRDD","DDRRDDLLLLUU","DDRRDDSRRRRSUUUU"]},{"name":"الفرن","hint":"بابان و٤ حلقات. الأصداء تفتح الطريق لبعضها، فكّر بمن يعبر أولًا. ابحث عن حلقة تقع قبل الباب مباشرة.","T":13,"maxEchoes":4,"rows":["#########","#A.bB.#.#","#a###.#.#","#..S#E#b#","###.###.#","#.b.....#","#########"],"par":2,"solution":["DDL","DDRRRRUU","DULLUURRRRDD"]},{"name":"ثلاثة أبواب","hint":"كل باب يحتاج صدى جديدًا. الترتيب مهم، وقد تحتاج إلى الانتظار.","T":16,"maxEchoes":4,"rows":["###########","#a##b######","#.##.######","#S.A.B.C.E#","######c####","###########"],"par":3,"solution":["UU","RSRRUU","UDRRRSRRD","UUDDRRRRRRRR"]},{"name":"ثلاث حلقات","hint":"حلقات ثلاث وباب واحد. لا يمكنك أن تكون في كل مكان، لكن أصداءك تستطيع.","T":12,"maxEchoes":4,"rows":["###########","#a#a#a#####","#.#.#.#####","#S.....A.E#","###########"],"par":3,"solution":["UU","RRUU","RRRRUU","RRRRRSRRR"]},{"name":"المفتاح المزدوج","hint":"بابان: الأول بحلقتين، والثاني بحلقة تقع بعده. فكّر بمن يعبر أولًا.","T":14,"maxEchoes":4,"rows":["###########","#a#a#######","#.#.#######","#S..A..B.E#","######b####","###########"],"par":3,"solution":["UU","RRUU","UDRRRRRD","UDRRRRRSRRR"]},{"name":"تسليم الراية","hint":"حلقة تحت الباب مباشرة: قف عليها وادخل في الخطوة نفسها.","T":14,"maxEchoes":4,"rows":["###########","#a#a#######","#.#.#######","#S..A.bB.E#","#####b#####","###########"],"par":3,"solution":["UU","RRUU","UDRRRRD","UDRRRRRRRR"]}];
+  var CHAPTERS = ["الدهليز", "الساعة", "الميزان", "الخزنة", "المنارة", "القلعة", "الأعماق"];
+  var PER = 8;
+  var Echo = window.Echo;
+  var $ = function (id) { return document.getElementById(id); };
+  var AR = "٠١٢٣٤٥٦٧٨٩";
+  function ar(n) { return String(n).replace(/\d/g, function (d) { return AR[d]; }); }
+  LEVELS.forEach(function (d) { d.L = Echo.parse(d); });
+
+  /* ---------- progress ---------- */
+  var KEY = "echo-progress-v1", memory = { stars: {} };
+  function loadProgress() {
+    try { var raw = localStorage.getItem(KEY); if (raw) { var p = JSON.parse(raw); if (p && p.stars) memory = p; } } catch (e) {}
+  }
+  function saveProgress() { try { localStorage.setItem(KEY, JSON.stringify(memory)); } catch (e) {} }
+  function starsOf(i) { return memory.stars[i] || 0; }
+  function maxDone() { var m = -1; for (var i = 0; i < LEVELS.length; i++) if (starsOf(i) > 0) m = i; return m; }
+  function unlocked(i) { return i <= maxDone() + 2; }
+  loadProgress();
+
+  /* ---------- colours (single source: CSS tokens) ---------- */
+  var COL = {};
+  function readColors() {
+    var cs = getComputedStyle(document.documentElement);
+    ["wall", "floor", "floor2", "me", "echo", "exit", "c0", "c1", "c2", "fg", "line", "bg"].forEach(function (k) {
+      COL[k] = cs.getPropertyValue("--" + k).trim();
+    });
+    COL.door = [COL.c0, COL.c1, COL.c2];
+  }
+  readColors();
+
+  /* ---------- menu ---------- */
+  function renderMenu() {
+    var host = $("chapters"); host.innerHTML = "";
+    var nextIdx = Math.min(maxDone() + 1, LEVELS.length - 1);
+    for (var c = 0; c * PER < LEVELS.length; c++) {
+      var from = c * PER, to = Math.min(LEVELS.length, from + PER), got = 0;
+      for (var i = from; i < to; i++) got += starsOf(i);
+      var sec = document.createElement("div"); sec.className = "chapter";
+      sec.innerHTML = '<div class="chapter-head"><h3>' + CHAPTERS[c % CHAPTERS.length] + '</h3><span>' + ar(got) + " / " + ar((to - from) * 3) + "</span></div>";
+      var grid = document.createElement("div"); grid.className = "levels";
+      for (var j = from; j < to; j++) {
+        var b = document.createElement("button"), s = starsOf(j);
+        b.className = "lv" + (j === nextIdx ? " next" : "");
+        b.dataset.i = j;
+        var open = unlocked(j);
+        b.setAttribute("aria-disabled", open ? "false" : "true");
+        b.setAttribute("aria-label", "المرحلة " + ar(j + 1) + (s ? "، " + ar(s) + " نجوم" : ""));
+        b.innerHTML = "<b>" + ar(j + 1) + '</b><span class="st">' + "<i>" + "★".repeat(s) + "</i>" + "★".repeat(3 - s) + "</span>";
+        grid.appendChild(b);
+      }
+      sec.appendChild(grid); host.appendChild(sec);
+    }
+    $("continue").textContent = maxDone() < 0 ? "ابدأ" : "تابع من المرحلة " + ar(nextIdx + 1);
+  }
+  $("chapters").addEventListener("click", function (e) {
+    var b = e.target.closest(".lv"); if (!b || b.getAttribute("aria-disabled") === "true") return;
+    startLevel(+b.dataset.i);
+  });
+  $("continue").addEventListener("click", function () { startLevel(Math.min(maxDone() + 1, LEVELS.length - 1)); });
+  $("wipe").addEventListener("click", function () {
+    if ($("wipe").dataset.armed === "1") { memory = { stars: {} }; saveProgress(); $("wipe").dataset.armed = "0"; $("wipe").textContent = "مسح التقدّم"; renderMenu(); return; }
+    $("wipe").dataset.armed = "1"; $("wipe").textContent = "اضغط مرة أخرى للتأكيد";
+    setTimeout(function () { $("wipe").dataset.armed = "0"; $("wipe").textContent = "مسح التقدّم"; }, 3500);
+  });
+
+  /* ---------- game state ---------- */
+  var S = { idx: 0, def: null, L: null, ghosts: [], moves: [], W: null, won: false, auto: null, usedSolution: false };
+  var cv = $("board"), ctx = cv.getContext("2d"), tile = 40, PW = 0, PH = 0, running = false;
+  var anim = { from: null, to: [], t0: 0, dur: 140 };
+
+  function cell(i) { return { x: i % S.L.w, y: Math.floor(i / S.L.w) }; }
+  function targets() {
+    var w = S.W, L = S.L, t = w.t, out = [cell(w.me[t])];
+    for (var k = 0; k < S.ghosts.length; k++) out.push(cell(w.ghostPos[k][Math.min(t, L.T)]));
+    return out;
+  }
+  function displayed(now) {
+    var p = Math.min(1, (now - anim.t0) / anim.dur); p = 1 - Math.pow(1 - p, 3);
+    return anim.to.map(function (to, i) {
+      var fr = (anim.from && anim.from[i]) || to;
+      return { x: fr.x + (to.x - fr.x) * p, y: fr.y + (to.y - fr.y) * p };
+    });
+  }
+  function retarget(dur) {
+    var now = performance.now(), cur = anim.to.length ? displayed(now) : null;
+    S.W = Echo.world(S.L, S.ghosts, S.moves);
+    anim.from = cur; anim.to = targets(); anim.t0 = now; anim.dur = dur || 140;
+    updateHud();
+  }
+
+  function layout() {
+    if (!S.L) return;
+    var L = S.L, avail = Math.min(480, $("stage").clientWidth || 360);
+    var maxH = Math.max(200, Math.floor(window.innerHeight * 0.44));
+    tile = Math.max(22, Math.min(56, Math.floor(avail / L.w), Math.floor(maxH / L.h)));
+    PW = tile * L.w; PH = tile * L.h;
+    var dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(PW * dpr); cv.height = Math.round(PH * dpr);
+    cv.style.width = PW + "px"; cv.style.height = PH + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", layout);
+
+  function startLevel(i) {
+    stopAuto();
+    S.idx = i; S.def = LEVELS[i]; S.L = S.def.L;
+    S.ghosts = []; S.moves = []; S.won = false; S.usedSolution = false;
+    anim.to = []; anim.from = null;
+    $("menu").hidden = true; $("play").hidden = false; $("win").hidden = true;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    $("title").innerHTML = "المرحلة " + ar(i + 1) + "<small>" + S.def.name + "</small>";
+    $("hint").textContent = S.def.hint;
+    $("echo").hidden = S.L.maxEchoes === 0; $("solve").hidden = !S.def.solution;
+    var tk = $("ticks"); tk.innerHTML = ""; for (var t = 0; t < S.L.T; t++) tk.appendChild(document.createElement("i"));
+    $("goal").textContent = "الهدف: " + ar(S.def.par);
+    setMsg("");
+    window.scrollTo(0, 0);
+    layout(); retarget(1); anim.from = null;
+    if (!running) { running = true; requestAnimationFrame(frame); }
+  }
+
+  function showMenu() {
+    stopAuto(); running = false; S.L = null;
+    $("play").hidden = true; $("win").hidden = true; $("menu").hidden = false;
+    renderMenu(); window.scrollTo(0, 0);
+  }
+  $("back").addEventListener("click", showMenu);
+  $("win-menu").addEventListener("click", showMenu);
+
+  function setMsg(text, kind) { var m = $("msg"); m.textContent = text || ""; m.className = kind || ""; }
+
+  function updateHud() {
+    var L = S.L, w = S.W, i;
+    var slots = $("slots"); slots.innerHTML = "";
+    for (i = 0; i < L.maxEchoes; i++) { var d = document.createElement("span"); d.className = "slot" + (i < S.ghosts.length ? " used" : ""); slots.appendChild(d); }
+    var ticks = $("ticks").children;
+    for (i = 0; i < ticks.length; i++) ticks[i].className = i < w.t ? (w.t >= L.T ? "hot" : "on") : "";
+    $("steptxt").textContent = "الخطوة " + ar(w.t) + " من " + ar(L.T);
+    $("echo").textContent = "سجّل صدى" + (L.maxEchoes ? " (" + ar(L.maxEchoes - S.ghosts.length) + ")" : "");
+    cv.setAttribute("aria-label", "لوحة اللعب، الخطوة " + ar(w.t) + " من " + ar(L.T) + "، عدد الأصداء " + ar(S.ghosts.length));
+  }
+
+  /* ---------- actions ---------- */
+  function popcount(n) { var c = 0; while (n) { c += n & 1; n >>= 1; } return c; }
+  function move(d) {
+    if (!S.L || S.won || S.auto) return;
+    var r = Echo.tryMove(S.L, S.ghosts, S.moves, d);
+    if (!r.ok) {
+      if (r.why === "time") { setMsg("انتهى وقت الجولة. تراجع خطوة أو سجّل صدى.", "warn"); }
+      else if (r.why === "door") {
+        var w = S.W, L = S.L, cur = w.me[w.t], v = Echo.DIRS[d];
+        var j = (Math.floor(cur / L.w) + v[1]) * L.w + (cur % L.w + v[0]), c = L.doorAt[j];
+        var mask = Echo.maskAt(L, w, w.t), need = popcount(L.colorMask[c]), have = popcount(mask & L.colorMask[c]);
+        setMsg("الباب مغلق: " + ar(have) + " من " + ar(need) + (need === 1 ? " حلقة مضغوطة" : " حلقات مضغوطة"), "warn");
+        shake();
+      } else shake();
+      return;
+    }
+    S.moves.push(d); setMsg(""); retarget(130);
+    if (S.W.solvedAt >= 0) win();
+    else if (S.moves.length >= S.L.T) setMsg("انتهى وقت الجولة. تراجع خطوة أو سجّل صدى.", "warn");
+  }
+  function shake() { cv.classList.remove("shake"); void cv.offsetWidth; cv.classList.add("shake"); }
+
+  function record() {
+    if (!S.L || S.won || S.auto) return;
+    if (S.ghosts.length >= S.L.maxEchoes) { setMsg("لا يوجد أصداء متبقية في هذه المرحلة.", "warn"); return; }
+    if (!S.moves.length) { setMsg("تحرّك أولًا، ثم سجّل جولتك كصدى.", "warn"); return; }
+    S.ghosts.push(S.moves.slice()); S.moves = []; setMsg(""); retarget(260);
+  }
+  function undo() {
+    if (!S.L || S.won || S.auto) return;
+    if (S.moves.length) S.moves.pop();
+    else if (S.ghosts.length) S.moves = S.ghosts.pop();
+    else return;
+    setMsg(""); retarget(130);
+  }
+  function reset() {
+    if (!S.L) return;
+    stopAuto(); S.ghosts = []; S.moves = []; S.won = false; $("win").hidden = true; setMsg(""); retarget(260);
+  }
+  $("undo").addEventListener("click", undo);
+  $("echo").addEventListener("click", record);
+  $("reset").addEventListener("click", reset);
+  $("dpad").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) move(b.dataset.d); });
+
+  /* keyboard */
+  var KEYS = { ArrowUp: "U", ArrowDown: "D", ArrowLeft: "L", ArrowRight: "R", w: "U", s: "D", a: "L", d: "R", " ": "S", ".": "S" };
+  window.addEventListener("keydown", function (e) {
+    if (!S.L || $("play").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    var onButton = document.activeElement && document.activeElement.tagName === "BUTTON";
+    if ((k === " " || k === "Enter") && onButton) return;
+    if (KEYS[k]) { e.preventDefault(); move(KEYS[k]); }
+    else if (k === "z" || k === "Backspace") { e.preventDefault(); undo(); }
+    else if (k === "e" || k === "Enter") { e.preventDefault(); record(); }
+    else if (k === "r") reset();
+  });
+
+  /* swipe on the board */
+  var sw = null;
+  cv.addEventListener("pointerdown", function (e) { sw = { x: e.clientX, y: e.clientY }; try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
+  cv.addEventListener("pointerup", function (e) {
+    if (!sw) return;
+    var dx = e.clientX - sw.x, dy = e.clientY - sw.y; sw = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return;
+    move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "R" : "L") : (dy > 0 ? "D" : "U"));
+  });
+  cv.addEventListener("pointercancel", function () { sw = null; });
+
+  /* ---------- solution playback ---------- */
+  function stopAuto() { if (S.auto) { clearInterval(S.auto); S.auto = null; } }
+  $("solve").addEventListener("click", function () {
+    if (!S.L || !S.def.solution || S.auto) return;
+    S.ghosts = []; S.moves = []; S.won = false; S.usedSolution = true; $("win").hidden = true; retarget(200);
+    var acts = [], sol = S.def.solution;
+    sol.forEach(function (round, i) { round.split("").forEach(function (c) { acts.push(c); }); if (i < sol.length - 1) acts.push("E"); });
+    setMsg("هذا هو الحل. شاهد كيف تتعاون الأصداء.");
+    S.auto = setInterval(function () {
+      var a = acts.shift();
+      if (!a) { stopAuto(); return; }
+      var keep = S.auto; S.auto = null;
+      if (a === "E") record(); else move(a);
+      S.auto = keep;
+      if (S.won) stopAuto();
+    }, 300);
+  });
+
+  /* ---------- winning ---------- */
+  function win() {
+    S.won = true; stopAuto();
+    var used = S.ghosts.length, par = S.def.par;
+    var stars = S.usedSolution ? 1 : (used <= par ? 3 : used === par + 1 ? 2 : 1);
+    if (stars > starsOf(S.idx)) { memory.stars[S.idx] = stars; saveProgress(); }
+    setTimeout(function () {
+      if (!S.won) return;
+      $("win-stars").innerHTML = "<i>" + "★".repeat(stars) + "</i>" + "★".repeat(3 - stars);
+      var last = S.idx >= LEVELS.length - 1;
+      $("win-title").textContent = last ? "أنهيت البرج" : "عبرت";
+      $("win-text").textContent = S.usedSolution ? "عُرض الحل هذه المرة. عدد الأصداء: " + ar(used) + "."
+        : "عدد الأصداء: " + ar(used) + (used <= par ? ". هذا أقل ما يمكن." : ". يمكن حلها بعدد أقل: " + ar(par) + ".");
+      $("win-next").hidden = last;
+      $("win").hidden = false; $("win-next").focus();
+    }, 520);
+  }
+  $("win-next").addEventListener("click", function () { startLevel(Math.min(S.idx + 1, LEVELS.length - 1)); });
+  $("win-again").addEventListener("click", function () { $("win").hidden = true; reset(); });
+
+  /* ---------- drawing ---------- */
+  function rr(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function plateIds(L, c) { var out = []; for (var i = 0; i < L.plates.length; i++) if (L.plates[i].color === c) out.push(i); return out; }
+
+  function frame(now) {
+    if (!running) return;
+    if (S.L && S.W) draw(now);
+    requestAnimationFrame(frame);
+  }
+
+  function draw(now) {
+    var L = S.L, w = S.W, ts = tile, x, y, i, k, t = w.t, T = L.T, sec = now / 1000;
+    var mask = Echo.maskAt(L, w, t);
+    ctx.clearRect(0, 0, PW, PH);
+    ctx.fillStyle = COL.wall; ctx.fillRect(0, 0, PW, PH);
+    for (y = 0; y < L.h; y++) for (x = 0; x < L.w; x++) {
+      if (L.wall[y * L.w + x]) continue;
+      ctx.fillStyle = ((x + y) & 1) ? COL.floor2 : COL.floor;
+      rr(x * ts + 1, y * ts + 1, ts - 2, ts - 2, ts * 0.14); ctx.fill();
+    }
+    var cx = function (i2) { return (i2 % L.w + 0.5) * ts; }, cy = function (i2) { return (Math.floor(i2 / L.w) + 0.5) * ts; };
+
+    // start marker
+    ctx.save(); ctx.strokeStyle = COL.me; ctx.globalAlpha = 0.3; ctx.setLineDash([3, 4]); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx(L.start), cy(L.start), ts * 0.36, 0, 6.2832); ctx.stroke(); ctx.restore();
+
+    // trails
+    ctx.save(); ctx.lineJoin = "round"; ctx.lineCap = "round";
+    for (k = 0; k < S.ghosts.length; k++) {
+      var gp = w.ghostPos[k], last = 0;
+      for (i = 1; i <= T; i++) if (gp[i] !== gp[i - 1]) last = i;
+      if (!last) continue;
+      ctx.strokeStyle = COL.echo; ctx.lineWidth = 3; ctx.setLineDash([4, 6]); ctx.globalAlpha = 0.22;
+      ctx.beginPath(); for (i = 0; i <= last; i++) { if (i) ctx.lineTo(cx(gp[i]), cy(gp[i])); else ctx.moveTo(cx(gp[0]), cy(gp[0])); } ctx.stroke();
+      ctx.setLineDash([]); ctx.globalAlpha = 0.5;
+      ctx.beginPath(); for (i = 0; i <= Math.min(t, last); i++) { if (i) ctx.lineTo(cx(gp[i]), cy(gp[i])); else ctx.moveTo(cx(gp[0]), cy(gp[0])); } ctx.stroke();
+    }
+    if (w.me.length > 1) {
+      ctx.setLineDash([]); ctx.strokeStyle = COL.me; ctx.globalAlpha = 0.35; ctx.lineWidth = 4;
+      ctx.beginPath(); for (i = 0; i < w.me.length; i++) { if (i) ctx.lineTo(cx(w.me[i]), cy(w.me[i])); else ctx.moveTo(cx(w.me[0]), cy(w.me[0])); } ctx.stroke();
+    }
+    ctx.restore();
+
+    // plates
+    for (i = 0; i < L.plates.length; i++) {
+      var p = L.plates[i], occ = (mask >> i) & 1, px = (p.x + 0.5) * ts, py = (p.y + 0.5) * ts;
+      ctx.save();
+      ctx.strokeStyle = COL.door[p.color]; ctx.fillStyle = COL.door[p.color]; ctx.lineWidth = 3;
+      ctx.globalAlpha = occ ? 0.95 : 0.2; if (occ) { ctx.shadowColor = COL.door[p.color]; ctx.shadowBlur = ts * 0.4; }
+      ctx.beginPath(); ctx.arc(px, py, ts * 0.27, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 0.9; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(px, py, ts * 0.3, 0, 6.2832); ctx.stroke();
+      ctx.restore();
+    }
+
+    // doors
+    for (i = 0; i < L.w * L.h; i++) {
+      var dc = L.doorAt[i]; if (dc < 0) continue;
+      var dx = (i % L.w) * ts, dy = Math.floor(i / L.w) * ts, open = Echo.doorOpen(L, mask, dc), ids = plateIds(L, dc);
+      ctx.save();
+      if (open) {
+        ctx.strokeStyle = COL.door[dc]; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; rr(dx + 3, dy + 3, ts - 6, ts - 6, ts * 0.12); ctx.stroke();
+      } else {
+        ctx.fillStyle = COL.door[dc]; ctx.globalAlpha = 0.92; rr(dx + 2, dy + 2, ts - 4, ts - 4, ts * 0.12); ctx.fill();
+        ctx.strokeStyle = COL.wall; ctx.globalAlpha = 0.5; ctx.lineWidth = 2;
+        for (var s = 1; s < 4; s++) { ctx.beginPath(); ctx.moveTo(dx + ts * s / 4, dy + 5); ctx.lineTo(dx + ts * s / 4, dy + ts - 5); ctx.stroke(); }
+      }
+      ctx.globalAlpha = 1;
+      var gap = Math.min(ts * 0.22, (ts - 8) / Math.max(1, ids.length)), pr = ts * 0.085;
+      for (var q = 0; q < ids.length; q++) {
+        var pxq = dx + ts / 2 + (q - (ids.length - 1) / 2) * gap, on = (mask >> ids[q]) & 1;
+        ctx.beginPath(); ctx.arc(pxq, dy + ts / 2, pr, 0, 6.2832);
+        ctx.fillStyle = on ? (open ? COL.door[dc] : COL.fg) : COL.wall; ctx.globalAlpha = on ? 1 : 0.65; ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // exit portal
+    ctx.save(); ctx.strokeStyle = COL.exit; ctx.lineWidth = 2.5;
+    for (i = 0; i < 3; i++) {
+      var rad = ts * (0.16 + i * 0.12) * (1 + 0.06 * Math.sin(sec * 2.4 + i));
+      ctx.globalAlpha = 0.9 - i * 0.25; ctx.beginPath(); ctx.arc(cx(L.exit), cy(L.exit), rad, 0, 6.2832); ctx.stroke();
+    }
+    ctx.restore();
+
+    // entities
+    var pos = displayed(now), meP = pos[0];
+    for (k = 0; k < S.ghosts.length; k++) {
+      var gpz = pos[k + 1]; if (!gpz) continue;
+      var gx = (gpz.x + 0.5) * ts, gy = (gpz.y + 0.5) * ts;
+      ctx.save(); ctx.fillStyle = COL.echo; ctx.globalAlpha = 0.62; ctx.shadowColor = COL.echo; ctx.shadowBlur = ts * 0.3;
+      ctx.beginPath(); ctx.arc(gx, gy, ts * 0.27, 0, 6.2832); ctx.fill(); ctx.restore();
+      ctx.save(); ctx.fillStyle = COL.wall; ctx.font = "700 " + Math.round(ts * 0.3) + "px Tajawal, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(ar(k + 1), gx, gy + ts * 0.02); ctx.restore();
+    }
+    var mx = (meP.x + 0.5) * ts, my = (meP.y + 0.5) * ts;
+    ctx.save(); ctx.shadowColor = COL.me; ctx.shadowBlur = ts * 0.5;
+    var gr = ctx.createRadialGradient(mx - ts * 0.08, my - ts * 0.1, ts * 0.03, mx, my, ts * 0.32);
+    gr.addColorStop(0, "#fffbee"); gr.addColorStop(1, COL.me);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(mx, my, ts * 0.3, 0, 6.2832); ctx.fill(); ctx.restore();
+  }
+
+  renderMenu();
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+}
+</script>
+</body>
+</html>
